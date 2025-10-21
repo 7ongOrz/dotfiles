@@ -1,2 +1,5 @@
 lazy-lock.json
-tmux/plugins/
+
+# Ignore tmux plugins but keep TPM submodule
+tmux/plugins/*
+!tmux/plugins/tpm
