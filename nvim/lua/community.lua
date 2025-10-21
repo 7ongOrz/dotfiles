@@ -12,12 +12,14 @@ return {
   { import = "astrocommunity.pack.cpp" },
   { import = "astrocommunity.pack.bash" },
   { import = "astrocommunity.pack.cmake" },
-  { import = "astrocommunity.pack.rust" },
-  { import = "astrocommunity.pack.go" },
-  { import = "astrocommunity.pack.typescript" },
 
-  -- === Web 前端 ===
-  { import = "astrocommunity.pack.html-css" },
+  -- === 重量级语言包（暂时注释，需要时再启用）===
+  -- { import = "astrocommunity.pack.rust" },        -- 🔴 ~200MB (rust-analyzer)
+  -- { import = "astrocommunity.pack.go" },          -- 🔴 ~100MB (gopls)
+  -- { import = "astrocommunity.pack.typescript" },  -- 🔴 ~120MB (tsserver + 多个工具)
+
+  -- === Web 前端（暂时注释）===
+  -- { import = "astrocommunity.pack.html-css" },    -- 🔴 ~80MB (多个 LSP)
 
   -- === 配置文件 ===
   { import = "astrocommunity.pack.docker" },
