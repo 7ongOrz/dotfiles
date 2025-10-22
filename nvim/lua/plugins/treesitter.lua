@@ -3,23 +3,20 @@
 ---@type LazySpec
 return {
   "nvim-treesitter/nvim-treesitter",
-  build = ":TSUpdate",
-  -- 最小变更：只在 init 设置 prefer_git，避免 tarball 解压
-  init = function()
-    require("nvim-treesitter.install").prefer_git = true
-  end,
+  branch = "main", -- 使用 main 分支，已恢复 configs 模块
   opts = {
     ensure_installed = {
       "lua",
       "vim",
-      "cmake",
-      "python",
-      "cpp",
-      "c",
-      "bash",
-      "json",
-      "jsonc",
-      "markdown",
+      "cmake", -- CMake syntax highlighting
+      "python", -- Python syntax highlighting
+      "cpp", -- C++ syntax highlighting
+      "c", -- C syntax highlighting
+      "bash", -- Bash syntax highlighting
+      "json", -- JSON syntax highlighting
+      "jsonc", -- JSON with comments syntax highlighting
+      "markdown", -- Markdown syntax highlighting
+      -- add more arguments for adding more treesitter parsers
     },
   },
 }
