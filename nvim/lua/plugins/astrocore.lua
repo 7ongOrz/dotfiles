@@ -37,16 +37,16 @@ return {
     },
     -- passed to `vim.filetype.add`
     filetypes = {
-      -- see `:h vim.filetype.add` for usage
-      extension = {
-        foo = "fooscript",
-      },
-      filename = {
-        [".foorc"] = "fooscript",
-      },
-      pattern = {
-        [".*/etc/foo/.*"] = "fooscript",
-      },
+      -- 自定义文件类型映射（参考 :h vim.filetype.add）
+      -- extension = {
+      --   myext = "myfiletype",
+      -- },
+      -- filename = {
+      --   [".myconfig"] = "myfiletype",
+      -- },
+      -- pattern = {
+      --   [".*/etc/myapp/.*"] = "myfiletype",
+      -- },
     },
     -- vim options can be configured here
     options = {

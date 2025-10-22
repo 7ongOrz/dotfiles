@@ -9,20 +9,24 @@ return {
     opts = {
       -- Make sure to use the names found in `:Mason`
       ensure_installed = {
-        -- install language servers
-        "lua-language-server",
-        "pyright",
-        "clangd", 
-        "bash-language-server",
-        "cmake-language-server",
+        -- ===== 语言服务器 =====
+        -- Python, C++, CMake LSP 已由社区包自动安装
+        -- basedpyright - 由 astrocommunity.pack.python 提供
+        -- clangd - 由 astrocommunity.pack.cpp 提供
+        -- neocmakelsp - 由 astrocommunity.pack.cmake 提供
 
-        -- install formatters
-        "stylua",
+        "lua-language-server", -- Lua LSP
+        "bash-language-server", -- Bash LSP
 
-        -- install debuggers
-        "debugpy",
+        -- ===== 格式化工具 =====
+        -- black, isort - 由 astrocommunity.pack.python 提供
+        "stylua", -- Lua formatter
 
-        -- install any other package
+        -- ===== 调试器 =====
+        -- debugpy - 由 astrocommunity.pack.python 提供
+        -- codelldb - 由 astrocommunity.pack.cpp 提供
+
+        -- ===== 其他工具 =====
         "tree-sitter-cli",
       },
     },

@@ -37,15 +37,18 @@ return {
     },
     -- enable servers that you already have installed without mason
     servers = {
-      "pyright", -- Python LSP
-      "clangd", -- C/C++ LSP
-      "bashls", -- Bash LSP
-      "cmake", -- CMake LSP
+      -- Python, C++, CMake LSP 已由社区包提供，无需重复声明
+      -- basedpyright - 由 astrocommunity.pack.python 提供
+      -- clangd - 由 astrocommunity.pack.cpp 提供
+      -- neocmake - 由 astrocommunity.pack.cmake 提供
+
+      "bashls", -- Bash LSP（社区包未包含）
     },
     -- customize language server configuration options passed to `lspconfig`
     ---@diagnostic disable: missing-fields
     config = {
-      clangd = { capabilities = { offsetEncoding = "utf-8" } },
+      -- clangd 配置已由 astrocommunity.pack.cpp 提供（包含 offsetEncoding = "utf-8"）
+      -- 如需覆盖社区包配置，可以在这里添加
     },
     -- customize how language servers are attached
     handlers = {
@@ -73,7 +76,7 @@ return {
           -- the rest of the autocmd options (:h nvim_create_autocmd)
           desc = "Refresh codelens (buffer)",
           callback = function(args)
-            if require("astrolsp").config.features.codelens then vim.lsp.codelens.refresh { bufnr = args.buf } end
+            if require("astrolsp").config.features.codelens then vim.lsp.codelens.refresh({ bufnr = args.buf }) end
           end,
         },
       },
@@ -91,7 +94,7 @@ return {
           function() require("astrolsp.toggles").buffer_semantic_tokens() end,
           desc = "Toggle LSP semantic highlight (buffer)",
           cond = function(client)
-            return client.supports_method "textDocument/semanticTokens/full" and vim.lsp.semantic_tokens ~= nil
+            return client.supports_method("textDocument/semanticTokens/full") and vim.lsp.semantic_tokens ~= nil
           end,
         },
       },
