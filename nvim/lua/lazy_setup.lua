@@ -18,6 +18,7 @@ require("lazy").setup({
   install = { colorscheme = { "astrotheme", "habamax" } },
   ui = { backdrop = 100 },
   concurrency = 10,
+  rocks = { enabled = false }, -- 禁用 luarocks 支持，避免 nvim-dap-python 依赖问题
   performance = {
     rtp = {
       -- disable some rtp plugins, add more to your liking

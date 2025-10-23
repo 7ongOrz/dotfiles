@@ -34,7 +34,7 @@ return {
   -- === 终端集成 ===
   { import = "astrocommunity.terminal-integration.vim-tmux-navigator" },
   -- { import = "astrocommunity.terminal-integration.vim-tmux-yank" },  -- 🔴 在非tmux环境中会创建异常文件
-  { import = "astrocommunity.terminal-integration.vim-tpipeline" },
+  { import = "astrocommunity.terminal-integration.vim-tpipeline" },     -- ✅ 基础配置，与自定义配置互补
 
   -- === Git 工具 ===
   { import = "astrocommunity.git.git-blame-nvim" },
