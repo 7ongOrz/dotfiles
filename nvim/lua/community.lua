@@ -33,7 +33,7 @@ return {
 
   -- === 终端集成 ===
   { import = "astrocommunity.terminal-integration.vim-tmux-navigator" },
-  { import = "astrocommunity.terminal-integration.vim-tmux-yank" },
+  -- { import = "astrocommunity.terminal-integration.vim-tmux-yank" },  -- 🔴 在非tmux环境中会创建异常文件
   { import = "astrocommunity.terminal-integration.vim-tpipeline" },
 
   -- === Git 工具 ===
