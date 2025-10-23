@@ -35,19 +35,6 @@ return {
       },
       update_in_insert = false, -- don't update diagnostics in insert mode
     },
-    -- passed to `vim.filetype.add`
-    filetypes = {
-      -- 自定义文件类型映射（参考 :h vim.filetype.add）
-      -- extension = {
-      --   myext = "myfiletype",
-      -- },
-      -- filename = {
-      --   [".myconfig"] = "myfiletype",
-      -- },
-      -- pattern = {
-      --   [".*/etc/myapp/.*"] = "myfiletype",
-      -- },
-    },
     -- vim options can be configured here
     options = {
       opt = { -- vim.opt.<key>

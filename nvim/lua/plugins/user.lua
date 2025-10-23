@@ -3,9 +3,6 @@
 ---@type LazySpec
 return {
 
-  -- == Discord Rich Presence ==
-  "andweeb/presence.nvim",
-
   -- == LSP Signature Helper ==
   {
     "ray-x/lsp_signature.nvim",
@@ -37,22 +34,6 @@ return {
         },
       },
     },
-  },
-
-  -- == Disable Better Escape ==
-  { "max397574/better-escape.nvim", enabled = false },
-
-  -- == LuaSnip Customization ==
-  {
-    "L3MON4D3/LuaSnip",
-    config = function(plugin, opts)
-      -- 调用 AstroNvim 默认配置（处理 vscode/snipmate/lua 加载器）
-      require("astronvim.plugins.configs.luasnip")(plugin, opts)
-
-      -- 扩展文件类型片段
-      local luasnip = require("luasnip")
-      luasnip.filetype_extend("javascript", { "javascriptreact" })
-    end,
   },
 
   -- == Autopairs Customization ==

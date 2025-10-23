@@ -43,6 +43,7 @@ return {
       -- neocmake - 由 astrocommunity.pack.cmake 提供
 
       "bashls", -- Bash LSP（社区包未包含）
+      -- "pyright"
     },
     -- customize language server configuration options passed to `lspconfig`
     ---@diagnostic disable: missing-fields

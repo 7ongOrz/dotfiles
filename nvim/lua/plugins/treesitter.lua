@@ -3,17 +3,21 @@
 ---@type LazySpec
 return {
   "nvim-treesitter/nvim-treesitter",
+  build = ":TSUpdate",
   opts = {
     ensure_installed = {
       "lua",
       "vim",
-      "cmake", -- CMake syntax highlighting
-      "python", -- Python syntax highlighting
-      "cpp", -- C++ syntax highlighting
-      "c", -- C syntax highlighting
-      "bash", -- Bash syntax highlighting
-      "json", -- JSON syntax highlighting
-      "markdown", -- Markdown syntax highlighting
+      "cmake",
+      "python",
+      "cpp",
+      "c",
+      "bash",
+      "json",
+      "jsonc",
+      "markdown",
+      "yaml",
+      "toml",
       -- add more arguments for adding more treesitter parsers
     },
   },
