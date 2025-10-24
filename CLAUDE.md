@@ -30,12 +30,11 @@ This is a **personal dotfiles repository** containing configurations for develop
 
 ## Language Support
 
-The Neovim configuration supports 15+ programming languages with full LSP, formatting, and syntax highlighting:
+The Neovim configuration supports 10 languages/formats with LSP, formatting, and syntax highlighting:
 
-**System Programming**: C, C++, Rust
-**Backend Development**: Python, Go
-**Web Development**: TypeScript, JavaScript, HTML, CSS
+**System Programming**: C++
 **Scripting**: Bash, Lua
+**Backend Development**: Python (lightweight LSP via pyright)
 **Configuration Files**: JSON, YAML, TOML, Markdown, Docker
 **Build Tools**: CMake
 
