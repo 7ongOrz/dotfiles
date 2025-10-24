@@ -13,6 +13,7 @@ return {
       "cpp",
       "c",
       "bash",
+      "dockerfile",
       "json",
       "jsonc",
       "markdown",

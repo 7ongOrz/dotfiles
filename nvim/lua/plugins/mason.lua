@@ -11,6 +11,7 @@ return {
       ensure_installed = {
         "lua-language-server",
         "bash-language-server",
+        "pyright", -- lightweight Python LSP with formatting support
         "stylua",
         "tree-sitter-cli",
       },

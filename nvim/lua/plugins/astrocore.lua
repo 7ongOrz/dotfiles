@@ -43,7 +43,7 @@ return {
         spell = false, -- sets vim.opt.spell
         signcolumn = "yes", -- sets vim.opt.signcolumn to yes
         wrap = true, -- sets vim.opt.wrap
-        cmdheight = 2, -- increase command line height to avoid copy prompts
+        cmdheight = 0, -- remove command line height to fix bottom black area
         clipboard = "unnamedplus", -- use system clipboard
         -- default indentation settings
         tabstop = 2, -- display width of tab character
