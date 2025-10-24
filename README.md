@@ -33,12 +33,11 @@ git submodule update --init --recursive
 
 ## 语言支持
 
-支持 15+ 种编程语言的 LSP、格式化和语法高亮：
+支持 10 种编程语言/格式的 LSP、格式化和语法高亮：
 
-**系统编程**: C, C++, Rust
-**后端开发**: Python, Go
-**Web 开发**: TypeScript, JavaScript, HTML, CSS
+**系统编程**: C++
 **脚本语言**: Bash, Lua
+**后端开发**: Python（轻量级 LSP via pyright）
 **配置文件**: JSON, YAML, TOML, Markdown, Docker
 **构建工具**: CMake
 
