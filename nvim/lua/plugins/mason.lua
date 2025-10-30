@@ -15,6 +15,9 @@ return {
         "stylua",
         "tree-sitter-cli",
       },
+      -- Disable auto-install during Docker build to avoid interruption
+      -- Tools will auto-install on first container startup
+      run_on_start = vim.env.DOCKER_BUILD ~= "1",
     },
   },
 }

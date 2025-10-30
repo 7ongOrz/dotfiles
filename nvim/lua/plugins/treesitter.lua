@@ -6,7 +6,6 @@ return {
   build = ":TSUpdate",
   opts = {
     sync_install = true,
-    auto_install = true,
     ensure_installed = {
       "lua",
       "vim",
