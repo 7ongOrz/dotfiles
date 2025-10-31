@@ -25,6 +25,10 @@ RUN set -eux; \
    Pinned versions of core plugins may have been updated
    Run `:Lazy update` again to get these updates.
    ```
+4. **开发机自动安装失效**：添加自定义 `config` 函数后，开发机正常启动时不会自动安装 Mason 工具
+   - **根因**：自定义 `config` 覆盖了 AstroNvim 默认 config，缺少 `run_on_start()` 方法调用
+   - 参考：[lazy.nvim #1082](https://github.com/folke/lazy.nvim/discussions/1082) - 只会执行最后一个 config 函数
+   - 参考：[mason-tool-installer #37](https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim/issues/37) - 延迟加载插件错过 VimEnter 事件
 
 ## 问题根源分析
 
@@ -61,9 +65,29 @@ RUN set -eux; \
 
 **结论**：这些是**过程中的瞬时警告**，不影响最终功能，类似于编译时的 warning。
 
+### 4. 开发机自动安装失效的根本原因
+
+**现象**：添加自定义 `config` 函数后，开发机正常启动时不会自动安装 Mason 工具了
+
+**根因分析**：
+
+1. **插件延迟加载**：`mason-tool-installer.nvim` 默认为延迟加载（`lazy: true`）
+2. **`run_on_start` 依赖 VimEnter 事件**：插件在 VimEnter 事件时自动检查并安装工具
+3. **自定义 config 覆盖默认行为**：添加自定义 `config` 函数后，覆盖了 AstroNvim 的默认配置
+4. **错过触发时机**：延迟加载的插件在 VimEnter 之后才加载，错过了 `run_on_start` 的触发时机
+
+**关键参考**：
+- 参考：[lazy.nvim #1082](https://github.com/folke/lazy.nvim/discussions/1082) - 只会执行最后一个 config 函数
+- 参考：[mason-tool-installer #37](https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim/issues/37) - 延迟加载插件错过 VimEnter 事件
+- AstroNvim 默认 config（`astronvim/plugins/configs/mason-tool-installer.lua`）包含 `run_on_start()` 方法调用，自定义 config 缺少此调用
+
+**解决方案**：
+- 移除自定义 `config` 函数，保留 AstroNvim 默认配置
+- 在 `polish.lua` 中创建 `MasonInstallAll` 命令，避免干扰插件配置
+
 ## 解决方案
 
-### 最终方案：创建自定义 `MasonInstallAll` 命令 + 使用 `Lazy! load`
+### 最终方案：在 `polish.lua` 中创建命令
 
 #### 1. 修改 Mason 配置（`nvim/lua/plugins/mason.lua`）
 
@@ -89,17 +113,35 @@ return {
       -- Tools will auto-install on first container startup
       run_on_start = vim.env.DOCKER_BUILD ~= "1",
     },
-    config = function(_, opts)
-      require("mason-tool-installer").setup(opts)
-
-      -- Create MasonInstallAll command for headless installation
-      -- MasonInstall runs in blocking/synchronous mode when no UI is attached (headless mode)
-      vim.api.nvim_create_user_command("MasonInstallAll", function()
-        vim.cmd("MasonInstall " .. table.concat(opts.ensure_installed, " "))
-      end, { desc = "Install all mason tools (blocking in headless mode)" })
-    end,
+    -- No config - use AstroNvim's default config which handles run_on_start correctly
   },
 }
+```
+
+#### 2. 在 `polish.lua` 中创建命令
+
+```lua
+-- This will run last in the setup process.
+-- This is just pure lua so anything that doesn't
+-- fit in the normal config locations above can go here
+
+-- Create MasonInstallAll command for Docker builds
+-- MasonInstall runs in blocking/synchronous mode when no UI is attached (headless mode)
+vim.api.nvim_create_user_command("MasonInstallAll", function()
+  local lazy_config = require("lazy.core.config")
+  local installer = lazy_config.plugins["mason-tool-installer.nvim"]
+
+  if installer and installer._.cache and installer._.cache.opts then
+    local tools = installer._.cache.opts.ensure_installed or {}
+    if #tools > 0 then
+      vim.cmd("MasonInstall " .. table.concat(tools, " "))
+    else
+      vim.notify("No tools configured in mason-tool-installer ensure_installed", vim.log.levels.WARN)
+    end
+  else
+    vim.notify("mason-tool-installer.nvim not configured", vim.log.levels.ERROR)
+  end
+end, { desc = "Install all mason tools (blocking in headless mode)" })
 ```
 
 **设计说明**：
@@ -119,14 +161,15 @@ RUN set -eux; \
 
 **关键改进**：
 
-1. **使用 `Lazy! load mason-tool-installer.nvim`**：强制加载插件，触发 `config` 函数执行，注册 `MasonInstallAll` 命令
+1. **使用 `Lazy! load mason-tool-installer.nvim`**：强制加载插件，触发配置处理并缓存，使 `polish.lua` 中的 `MasonInstallAll` 命令可以访问插件配置
 2. **移除 `sleep 30`**：不再需要，因为 `MasonInstall` 在 headless 下自动阻塞
 
 **为什么需要 `Lazy! load`？**
 
-- 第一步 `Lazy! sync` 只是下载插件文件
-- 插件可能是延迟加载的，`config` 函数未执行
-- `Lazy! load` 强制加载插件并执行配置，注册自定义命令
+- 第一步 `Lazy! sync` 只是下载插件文件到磁盘
+- 插件是延迟加载的，配置还没有被 Lazy.nvim 处理并缓存
+- `Lazy! load` 强制加载插件，触发 Lazy.nvim 处理 `opts` 并缓存到 `_.cache.opts`
+- `MasonInstallAll` 命令（在 `polish.lua` 中定义）需要从这个缓存中读取 `ensure_installed` 列表
 - 参考：[lazy.nvim 文档 - `:Lazy load`](https://lazy.folke.io/usage)
 
 ### 可选方案：过滤构建日志中的警告
