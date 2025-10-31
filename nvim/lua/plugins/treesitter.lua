@@ -5,7 +5,8 @@ return {
   "nvim-treesitter/nvim-treesitter",
   build = ":TSUpdate",
   opts = {
-    sync_install = true,
+    -- Enable sync_install only during Docker build to avoid slow installations on dev machines
+    sync_install = vim.env.DOCKER_BUILD == "1",
     ensure_installed = {
       "lua",
       "vim",
