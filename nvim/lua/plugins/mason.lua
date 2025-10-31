@@ -19,5 +19,14 @@ return {
       -- Tools will auto-install on first container startup
       run_on_start = vim.env.DOCKER_BUILD ~= "1",
     },
+    config = function(_, opts)
+      require("mason-tool-installer").setup(opts)
+
+      -- Create MasonInstallAll command for headless installation
+      -- MasonInstall runs in blocking/synchronous mode when no UI is attached (headless mode)
+      vim.api.nvim_create_user_command("MasonInstallAll", function()
+        vim.cmd("MasonInstall " .. table.concat(opts.ensure_installed, " "))
+      end, { desc = "Install all mason tools (blocking in headless mode)" })
+    end,
   },
 }
