@@ -121,7 +121,9 @@ lazy.nvim 文档明确建议："**Always use opts instead of config when possibl
 
 ## 解决方案
 
-### 最终方案：在 `polish.lua` 中创建命令
+本文提供两种解决方案，均可正常工作。**推荐使用方案 B**，它不依赖内部 API，代码更集中且向前兼容性更好。
+
+### 方案 A：在 `polish.lua` 中创建命令
 
 #### 1. 修改 Mason 配置（`nvim/lua/plugins/mason.lua`）
 
@@ -205,6 +207,190 @@ RUN set -eux; \
 - `Lazy! load` 强制加载插件，触发 Lazy.nvim 处理 `opts` 并缓存到 `_.cache.opts`
 - `MasonInstallAll` 命令（在 `polish.lua` 中定义）需要从这个缓存中读取 `ensure_installed` 列表
 - 参考：[lazy.nvim 文档 - `:Lazy load`](https://lazy.folke.io/usage)
+
+**方案 A 的详细执行流程**：
+
+```
+【开发机启动】
+1. Neovim 启动
+2. lazy.nvim 处理插件 spec，注册插件为延迟加载（cmd = {...}）
+3. polish.lua 执行
+   → 创建 MasonInstallAll 命令（此时插件未加载，_.cache 为空）
+4. 用户触发加载条件（如执行 :Mason）
+5. 插件被加载：
+   → plugin/mason-tool-installer.lua 执行（尝试注册 VimEnter autocmd）
+      ❌ VimEnter 已过，autocmd 不会触发（自动触发失效）
+   → AstroNvim 默认 config 执行：
+      - setup(opts)  # opts.run_on_start = true（开发机）
+      - run_on_start()  # ✅ 手动触发，自动安装工具
+   → opts 被缓存到 _.cache.opts
+
+【Docker 构建】
+1. 第一步：DOCKER_BUILD=1 nvim --headless "+Lazy! sync" +qa
+   → 下载所有插件文件到磁盘
+   → polish.lua 执行，创建 MasonInstallAll 命令
+   → Lazy! sync 处理所有插件，但不加载延迟加载的插件
+2. 第二步：nvim --headless "+Lazy! load mason-tool-installer.nvim" "+MasonInstallAll" +qa
+   → Lazy! load 强制加载插件：
+      - 触发 opts 处理
+      - 执行 AstroNvim 默认 config：
+        · setup(opts)  # opts.run_on_start = false（Docker）
+        · run_on_start() 不执行（因为 run_on_start = false）
+      - opts 缓存到 _.cache.opts
+   → MasonInstallAll 命令执行：
+      - 从 _.cache.opts 读取 ensure_installed
+      - 执行 MasonInstall 安装工具（阻塞模式）
+```
+
+### 方案 B：在 config 函数中扩展默认配置（推荐）
+
+#### 1. 修改 Mason 配置（`nvim/lua/plugins/mason.lua`）
+
+```lua
+-- Customize Mason
+
+---@type LazySpec
+return {
+  -- use mason-tool-installer for automatically installing Mason packages
+  {
+    "WhoIsSethDaniel/mason-tool-installer.nvim",
+    opts = {
+      ensure_installed = {
+        "lua-language-server",
+        "bash-language-server",
+        "pyright", -- lightweight Python LSP with formatting support
+        "stylua",
+        "tree-sitter-cli",
+      },
+      run_on_start = vim.env.DOCKER_BUILD ~= "1",
+    },
+    -- Extend AstroNvim's default config instead of replacing it
+    config = function(plugin, opts)
+      -- Call AstroNvim's default config (handles run_on_start correctly)
+      require("astronvim.plugins.configs.mason-tool-installer")(plugin, opts)
+
+      -- Add custom command for Docker builds
+      vim.api.nvim_create_user_command("MasonInstallAll", function()
+        vim.cmd("MasonInstall " .. table.concat(opts.ensure_installed, " "))
+      end, { desc = "Install all mason tools (blocking in headless mode)" })
+    end,
+  },
+}
+```
+
+#### 2. 禁用 `polish.lua`（可选）
+
+如果之前使用方案 A，可以在 `polish.lua` 开头添加禁用行保留代码：
+
+```lua
+if true then return end -- WARN: REMOVE THIS LINE TO ACTIVATE THIS FILE
+```
+
+#### 3. Dockerfile 命令（与方案 A 相同）
+
+```dockerfile
+RUN set -eux; \
+    DOCKER_BUILD=1 nvim --headless "+Lazy! sync" +qa >/dev/null && \
+    nvim --headless "+Lazy! load mason-tool-installer.nvim" "+MasonInstallAll" +qa >/dev/null; \
+    rm -rf "${HOME}/.cache/nvim" "${HOME}/.local/state/nvim"
+```
+
+**为什么仍然需要 `Lazy! load`？**
+
+- 插件是延迟加载的，config 函数只在插件被加载时才执行
+- 如果不先加载插件，MasonInstallAll 命令根本不存在
+- `Lazy! load` 强制加载插件 → 触发 config 函数 → 创建命令
+
+**方案 B 的详细执行流程**：
+
+```
+【开发机启动】
+1. Neovim 启动
+2. lazy.nvim 处理插件 spec，注册插件为延迟加载（cmd = {...}）
+3. 用户触发加载条件（如执行 :Mason）
+4. 插件被加载：
+   → plugin/mason-tool-installer.lua 执行（尝试注册 VimEnter autocmd）
+      ❌ VimEnter 已过，autocmd 不会触发（自动触发失效）
+   → 自定义 config 执行（opts 作为参数传入）：
+      - 调用 AstroNvim 默认 config：
+        · setup(opts)  # opts.run_on_start = true（开发机）
+        · run_on_start()  # ✅ 手动触发，自动安装工具
+      - 创建 MasonInstallAll 命令（opts.ensure_installed 已可用）
+
+【Docker 构建】
+1. 第一步：DOCKER_BUILD=1 nvim --headless "+Lazy! sync" +qa
+   → 下载所有插件文件到磁盘
+   → Lazy! sync 处理所有插件，但不加载延迟加载的插件
+2. 第二步：nvim --headless "+Lazy! load mason-tool-installer.nvim" "+MasonInstallAll" +qa
+   → Lazy! load 强制加载插件：
+      - 触发 opts 处理
+      - 执行自定义 config（opts 作为参数传入）：
+        · 调用 AstroNvim 默认 config：
+          - setup(opts)  # opts.run_on_start = false（Docker）
+          - run_on_start() 不执行（因为 run_on_start = false）
+        · 创建 MasonInstallAll 命令（使用 opts.ensure_installed）
+   → MasonInstallAll 命令执行：
+      - 使用 opts.ensure_installed（config 闭包中的变量）
+      - 执行 MasonInstall 安装工具（阻塞模式）
+```
+
+### 两种方案详细对比
+
+#### run_on_start() 触发机制对比
+
+| 触发方式 | 机制说明 | 方案 A | 方案 B | 备注 |
+|---------|----------|--------|--------|------|
+| **自动触发** | VimEnter autocmd | ❌ 失效 | ❌ 失效 | 延迟加载导致注册太晚 |
+| **手动触发** | config 中显式调用 | ✅ AstroNvim 默认 config | ✅ 显式调用默认 config | 两者都保留了手动触发 |
+
+#### 技术实现对比
+
+| 对比项 | 方案 A（polish.lua） | 方案 B（config 扩展）⭐ |
+|--------|---------------------|------------------------|
+| **代码位置** | 分散：mason.lua + polish.lua | 集中：仅 mason.lua |
+| **命令创建时机** | polish.lua 启动时立即创建 | config 函数执行时创建（插件加载时） |
+| **工具列表获取** | 运行时从 `_.cache.opts` 读取 | config 参数 `opts` 直接使用 |
+| **API 依赖** | ❌ 依赖 `_.cache.opts`（内部 API） | ✅ 使用 config 参数 `opts`（公开 API） |
+| **向前兼容性** | ⚠️ lazy.nvim 内部结构变化可能破坏 | ✅ 显式调用默认 config，自动继承更新 |
+| **维护性** | ⚠️ 需要同步维护两个文件 | ✅ 单文件，关注点集中 |
+
+#### 功能完整性对比
+
+| 场景 | 方案 A | 方案 B | 结果 |
+|------|--------|--------|------|
+| **开发机 - 自动安装** | | | |
+| run_on_start 调用 | ✅ 默认 config 手动触发 | ✅ 显式调用默认 config 手动触发 | 完全相同 |
+| 自动安装工具 | ✅ 正常工作 | ✅ 正常工作 | **完全相同** |
+| **Docker - 手动安装** | | | |
+| run_on_start 调用 | ❌ 不调用（DOCKER_BUILD=1） | ❌ 不调用（DOCKER_BUILD=1） | 完全相同 |
+| 需要 Lazy! load | ✅ 触发 opts 缓存 | ✅ 触发 config 执行 | 完全相同 |
+| MasonInstallAll | 从 `_.cache.opts` 读取 | 使用 config 闭包中的 `opts` | 功能相同，实现不同 |
+| Dockerfile 命令 | 两步 + Lazy! load | 两步 + Lazy! load | **完全相同** |
+
+#### 核心差异总结
+
+1. **`Lazy! load` 的作用**：
+   - 方案 A：触发 lazy.nvim 处理 `opts` 并缓存到 `_.cache.opts`，供 polish.lua 中已创建的命令读取
+   - 方案 B：触发插件加载 → 执行 config 函数 → 创建命令（命令创建时 `opts` 作为参数可用）
+
+2. **命令和数据的时序关系**：
+   - 方案 A：命令先创建（polish.lua 启动时），数据后获取（Lazy! load 时缓存）→ 时序解耦，依赖缓存
+   - 方案 B：命令和数据同时可用（config 函数执行时，`opts` 作为参数传入）→ 时序一致，无需缓存
+
+3. **最佳实践符合度**：
+   - 方案 A：符合 "优先使用 opts" 建议，不自定义 config，保留默认行为
+   - 方案 B：符合 "扩展 config 而非替换" 建议，显式调用默认 config 后添加功能
+
+**推荐方案 B 的原因**：
+
+1. ✅ **不依赖内部 API**：使用 config 函数参数 `opts`，这是 lazy.nvim 的公开稳定接口
+2. ✅ **代码集中管理**：所有 Mason 相关逻辑在一个文件中，易于维护和理解
+3. ✅ **向前兼容性好**：显式调用 AstroNvim 的默认 config，框架更新会自动继承
+4. ✅ **时序一致性好**：命令创建时数据已准备好（参数传入），无需依赖异步缓存
+
+**方案 A 的适用场景**：
+
+如果你有多个插件需要类似的自定义命令，且希望集中管理所有自定义命令（而非分散在各个插件配置中），polish.lua 方案提供了统一的命令管理位置。但需要注意内部 API 的兼容性风险。
 
 ### 可选方案：过滤构建日志中的警告
 
