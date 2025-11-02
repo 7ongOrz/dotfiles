@@ -392,6 +392,197 @@ RUN set -eux; \
 
 如果你有多个插件需要类似的自定义命令，且希望集中管理所有自定义命令（而非分散在各个插件配置中），polish.lua 方案提供了统一的命令管理位置。但需要注意内部 API 的兼容性风险。
 
+### 技术原理深度解析
+
+#### 方案 B 为什么可以生效？
+
+**lazy.nvim 的 config 函数调用机制**（源码：`lazy.nvim/lua/lazy/core/loader.lua:379-380`）：
+
+```lua
+function M.config(plugin)
+  if type(plugin.config) == "function" then
+    fn = function()
+      local opts = Plugin.values(plugin, "opts", false)  -- 处理并合并 opts
+      plugin.config(plugin, opts)                        -- 作为参数传递给你的 config
+    end
+  end
+end
+```
+
+**执行流程**：
+
+1. 插件被加载（通过 `:Mason` 或 `Lazy! load`）
+2. lazy.nvim 调用 `Plugin.values()` 处理所有 `opts`
+3. 将处理好的 `opts` 作为参数传递给你的 `config` 函数
+4. 你的 config 函数接收 `opts`，并通过闭包机制保存
+
+**关键机制：Lua 闭包（Closure）**
+
+```lua
+config = function(plugin, opts)  -- ← lazy.nvim 传入的 opts
+  require("astronvim...").default_config(plugin, opts)
+
+  vim.api.nvim_create_user_command("MasonInstallAll", function()
+    -- ✅ 闭包：内层函数可以访问外层函数的 opts
+    vim.cmd("MasonInstall " .. table.concat(opts.ensure_installed, " "))
+  end, ...)
+end
+```
+
+**为什么生效**：
+- ✅ `opts` 是 lazy.nvim 调用 config 时传入的参数（公开 API）
+- ✅ 闭包机制让命令函数可以访问外层的 `opts`
+- ✅ 不需要访问任何内部数据结构
+
+#### 两种方案的本质区别
+
+**方案 A：运行时访问内部状态**
+
+```lua
+-- polish.lua（启动时执行）
+vim.api.nvim_create_user_command("MasonInstallAll", function()
+  -- ❌ 每次执行时都要"查找"数据
+  local installer = require("lazy.core.config").plugins["mason-tool-installer.nvim"]
+  local tools = installer._.cache.opts.ensure_installed  -- 访问内部 API
+  vim.cmd("MasonInstall " .. table.concat(tools, " "))
+end, ...)
+```
+
+**数据流**：
+```
+polish.lua → require("lazy.core.config") → plugins[...] → _.cache → opts
+            ↑________________访问内部实现（运行时查找）_______________↑
+```
+
+**方案 B：闭包捕获参数**
+
+```lua
+-- mason.lua（插件加载时执行）
+config = function(plugin, opts)  -- ← lazy.nvim 传入
+  vim.api.nvim_create_user_command("MasonInstallAll", function()
+    -- ✅ 使用闭包捕获的数据
+    vim.cmd("MasonInstall " .. table.concat(opts.ensure_installed, " "))
+  end, ...)
+end
+```
+
+**数据流**：
+```
+lazy.nvim → Plugin.values() → opts → config(plugin, opts) → 闭包捕获
+                                     ↑_____公开 API_____↑
+```
+
+#### 为什么不应该依赖内部 API？
+
+**1. 语义约定：`_` 开头表示私有**
+
+在 Lua/JavaScript 等动态语言中，`_` 开头是约定俗成的"私有"标记：
+
+```lua
+-- lazy.nvim 的设计
+plugin._ = {        -- _ 表示"这是内部实现"
+  cache = {...},    -- 不保证向后兼容
+  loaded = true,    -- 可能随时改变
+}
+```
+
+**2. 实际风险：结构可能随时改变**
+
+假设 lazy.nvim 的版本演进：
+
+```lua
+-- v11.x（当前）
+plugin._.cache.opts = {...}
+
+-- v12.x（可能的重构）
+plugin._.cache.options = {...}  -- 改名！
+
+-- v13.x（可能完全改变）
+plugin._internal.config_cache = {...}  -- 结构变了！
+```
+
+**你的方案 A 代码会在更新后崩溃**：
+
+```lua
+-- 你的代码
+local tools = installer._.cache.opts.ensure_installed
+-- v12: ❌ 'opts' 字段不存在了（改名为 options）
+-- v13: ❌ 'cache' 字段不存在了（改名为 config_cache）
+```
+
+**3. lazy.nvim 的真实改动记录**
+
+查看 lazy.nvim 的 git 历史可以看到，cache 相关的改动很频繁：
+
+```bash
+fd8229d fix(pkg): versioning and reload specs when pkg-cache is dirty
+312e424 fix(loader): when reloading, clear plugin properties cache
+c1b9887 perf(plugin): cache lazy handler values
+```
+
+内部实现在持续优化和重构，依赖它们会导致代码随时失效。
+
+**4. 公开 API 已经足够**
+
+lazy.nvim 的设计意图非常清晰：
+
+| 接口类型 | 标识 | 保证 | 用途 |
+|---------|------|------|------|
+| **公开 API** | 函数参数 `opts` | ✅ 向后兼容 | 供用户使用 |
+| **内部实现** | `_.cache` 等 | ❌ 随时可改 | 内部优化 |
+
+方案 B 使用公开 API（函数参数）+ 闭包机制，无需访问内部状态。
+
+#### 闭包机制的优雅之处
+
+**执行时序**：
+
+```
+【插件加载时】
+lazy.nvim 调用: config(plugin, opts)
+                ↓
+你的 config 执行:
+  1. 调用默认 config（保留原有行为）
+  2. 创建命令（opts 被闭包捕获）
+                ↓
+命令函数: function() ... opts.ensure_installed ... end
+          ↑_______ opts 保存在闭包中 _______↑
+
+【用户执行命令时】
+:MasonInstallAll
+  ↓
+命令函数执行，直接使用闭包中的 opts
+（无需访问 _.cache，无需运行时查找）
+```
+
+**代码对比**：
+
+```lua
+-- 方案 A：每次执行都要"查找"
+function()
+  local config = require("lazy.core.config")           -- 查找
+  local installer = config.plugins["..."]              -- 查找
+  local tools = installer._.cache.opts.ensure_installed -- 查找
+end
+
+-- 方案 B：直接使用闭包变量
+config = function(plugin, opts)
+  vim.api.nvim_create_user_command("...", function()
+    local tools = opts.ensure_installed  -- 直接访问，无需查找
+  end, ...)
+end
+```
+
+#### 总结：方案 B 的三大优势
+
+| 优势 | 说明 |
+|------|------|
+| **稳定性** | 使用公开 API（函数参数），lazy.nvim 保证向后兼容 |
+| **性能** | 闭包直接保存数据，无需运行时查找内部状态 |
+| **优雅** | 符合 lazy.nvim 的设计意图，代码更清晰易懂 |
+
+**一句话总结**：方案 B 不是"访问内部状态"，而是"接收参数并通过闭包保存"，这是 Lua 和 lazy.nvim 推荐的标准做法。
+
 ### 可选方案：过滤构建日志中的警告
 
 如果想要更清爽的构建日志，可以过滤掉那些不影响功能的警告：
