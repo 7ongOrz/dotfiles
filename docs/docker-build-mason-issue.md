@@ -26,8 +26,9 @@ RUN set -eux; \
    Run `:Lazy update` again to get these updates.
    ```
 4. **开发机自动安装失效**：添加自定义 `config` 函数后，开发机正常启动时不会自动安装 Mason 工具
-   - **根因**：自定义 `config` 覆盖了 AstroNvim 默认 config，缺少 `run_on_start()` 方法调用
-   - 参考：[lazy.nvim #1082](https://github.com/folke/lazy.nvim/discussions/1082) - 只会执行最后一个 config 函数
+   - **根因**：lazy.nvim 的 config 完全替换机制 + 延迟加载导致 VimEnter 事件错过
+   - 用户自定义 config **完全替换**了 AstroNvim 默认 config，导致缺少关键的 `run_on_start()` 调用
+   - 参考：[lazy.nvim 文档](https://lazy.folke.io/spec) - config 会被替换而非合并（推荐使用 opts）
    - 参考：[mason-tool-installer #37](https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim/issues/37) - 延迟加载插件错过 VimEnter 事件
 
 ## 问题根源分析
@@ -71,19 +72,52 @@ RUN set -eux; \
 
 **根因分析**：
 
-1. **插件延迟加载**：`mason-tool-installer.nvim` 默认为延迟加载（`lazy: true`）
-2. **`run_on_start` 依赖 VimEnter 事件**：插件在 VimEnter 事件时自动检查并安装工具
-3. **自定义 config 覆盖默认行为**：添加自定义 `config` 函数后，覆盖了 AstroNvim 的默认配置
-4. **错过触发时机**：延迟加载的插件在 VimEnter 之后才加载，错过了 `run_on_start` 的触发时机
+要理解这个问题，需要先了解 `run_on_start()` 的两种触发机制：
 
-**关键参考**：
-- 参考：[lazy.nvim #1082](https://github.com/folke/lazy.nvim/discussions/1082) - 只会执行最后一个 config 函数
-- 参考：[mason-tool-installer #37](https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim/issues/37) - 延迟加载插件错过 VimEnter 事件
-- AstroNvim 默认 config（`astronvim/plugins/configs/mason-tool-installer.lua`）包含 `run_on_start()` 方法调用，自定义 config 缺少此调用
+1. **自动触发**：插件的 `plugin/mason-tool-installer.lua` 在加载时会注册 VimEnter 事件的 autocmd 来自动调用 `run_on_start()`
+2. **手动触发**：在 config 函数中显式调用 `require("mason-tool-installer").run_on_start()`
+
+**问题的根本原因**：
+
+1. **延迟加载导致自动触发失效**
+   - AstroNvim 通过 `cmd = {...}` 将插件设置为延迟加载
+   - 当插件最终被加载时，VimEnter 事件早已触发并结束
+   - 插件的 VimEnter autocmd 注册太晚，无法触发
+   - 参考：[mason-tool-installer #37](https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim/issues/37) - 明确指出延迟加载时 VimEnter 事件不会触发
+
+2. **AstroNvim 通过手动触发解决了这个问题**
+   - 默认 config（`astronvim/plugins/configs/mason-tool-installer.lua`）实现：
+     ```lua
+     return function(_, opts)
+       local mason_tool_installer = require "mason-tool-installer"
+       mason_tool_installer.setup(opts)
+       if opts.run_on_start ~= false then mason_tool_installer.run_on_start() end
+     end
+     ```
+   - 在 setup 之后手动调用 `run_on_start()`，确保即使错过 VimEnter 也能执行
+
+3. **用户的自定义 config 完全替换了默认 config**
+   - lazy.nvim 的设计：当用户定义自己的 config 函数时，它会**完全替换**（而非合并）框架提供的 config
+   - 参考：[lazy.nvim 文档](https://lazy.folke.io/spec) - "config is executed when the plugin loads. The default implementation will automatically run require(MAIN).setup(opts)"
+   - 用户的 config 只调用了 `setup(opts)`，**缺少了关键的 `run_on_start()` 调用**
+
+4. **最终结果**：`run_on_start()` 从未被调用
+   - 自动触发：已因延迟加载而失效
+   - 手动触发：被用户的 config 替换掉了
+
+**关键发现**：
+
+lazy.nvim 文档明确建议："**Always use opts instead of config when possible**"。原因就是 `opts` 会被合并，而 `config` 会被替换。
 
 **解决方案**：
-- 移除自定义 `config` 函数，保留 AstroNvim 默认配置
-- 在 `polish.lua` 中创建 `MasonInstallAll` 命令，避免干扰插件配置
+- ✅ 移除自定义 `config` 函数，只使用 `opts` 来配置插件
+- ✅ 保留 AstroNvim 默认 config，它包含必要的 `run_on_start()` 调用
+- ✅ 在 `polish.lua` 中创建 `MasonInstallAll` 命令，避免干扰插件配置
+
+**源码验证**：
+- `/root/.local/share/nvim/lazy/AstroNvim/lua/astronvim/plugins/configs/mason-tool-installer.lua:4` - 显示默认 config 会调用 `run_on_start()`
+- `/root/.local/share/nvim/lazy/mason-tool-installer.nvim/plugin/mason-tool-installer.lua:1-7` - 显示 VimEnter autocmd 的自动触发机制
+- `/root/.local/share/nvim/lazy/mason-tool-installer.nvim/lua/mason-tool-installer/init.lua:287-291` - `run_on_start()` 函数实现
 
 ## 解决方案
 
