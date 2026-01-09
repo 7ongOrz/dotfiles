@@ -3,6 +3,7 @@
 ---@type LazySpec
 return {
   "nvim-treesitter/nvim-treesitter",
+  branch = "master",
   build = ":TSUpdate",
   opts = {
     -- Enable sync_install only during Docker build to avoid slow installations on dev machines

@@ -15,6 +15,7 @@ return {
   -- == Custom Dashboard ==
   {
     "folke/snacks.nvim",
+    version = "^2",
     opts = {
       dashboard = {
         preset = {
@@ -39,6 +40,7 @@ return {
   -- == Autopairs Customization ==
   {
     "windwp/nvim-autopairs",
+    commit = "c2a0dd0d931d0fb07665e1fedb1ea688da3b80b4",
     config = function(plugin, opts)
       -- 调用 AstroNvim 默认配置
       require("astronvim.plugins.configs.nvim-autopairs")(plugin, opts)

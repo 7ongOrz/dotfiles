@@ -5,6 +5,7 @@ return {
   -- use mason-tool-installer for automatically installing Mason packages
   {
     "WhoIsSethDaniel/mason-tool-installer.nvim",
+    commit = "517ef5994ef9d6b738322664d5fdd948f0fdeb46",
     -- overrides `require("mason-tool-installer").setup(...)`
     opts = {
       -- Make sure to use the names found in `:Mason`

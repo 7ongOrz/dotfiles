@@ -50,6 +50,9 @@ return {
     config = {
       -- clangd 配置已由 astrocommunity.pack.cpp 提供（包含 offsetEncoding = "utf-8"）
       -- 如需覆盖社区包配置，可以在这里添加
+      neocmake = {
+        cmd = { "neocmakelsp", "stdio" },
+      },
     },
     -- customize how language servers are attached
     handlers = {
