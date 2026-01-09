@@ -50,6 +50,11 @@ return {
     config = {
       -- clangd 配置已由 astrocommunity.pack.cpp 提供（包含 offsetEncoding = "utf-8"）
       -- 如需覆盖社区包配置，可以在这里添加
+
+      -- neocmakelsp 0.9.0+ requires subcommand syntax instead of flag
+      neocmake = {
+        cmd = { "neocmakelsp", "stdio" }, -- override old '--stdio' flag syntax
+      },
     },
     -- customize how language servers are attached
     handlers = {
