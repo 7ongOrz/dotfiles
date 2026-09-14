@@ -166,8 +166,8 @@ return {
         },
 
         -- Diagnostic navigation
-        ["]d"] = { function() vim.diagnostic.goto_next() end, desc = "Next diagnostic" },
-        ["[d"] = { function() vim.diagnostic.goto_prev() end, desc = "Previous diagnostic" },
+        ["]d"] = { function() vim.diagnostic.jump { count = vim.v.count1 } end, desc = "Next diagnostic" },
+        ["[d"] = { function() vim.diagnostic.jump { count = -vim.v.count1 } end, desc = "Previous diagnostic" },
         ["<Leader>ld"] = { function() vim.diagnostic.open_float() end, desc = "Show line diagnostics" },
         ["<Leader>lD"] = { function() vim.diagnostic.setloclist() end, desc = "Show diagnostics list" },
 
